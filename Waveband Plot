@@ -1,0 +1,66 @@
+# Load necessary libraries
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(readr)
+
+setwd("E:/DON_Pheno_Geno_Prediction")
+
+####################################################################################################
+# Read phenomic data
+library(tidyverse)
+
+# Load dataset
+data <- read_csv("Savitz_Training_Set_2022_Phenomic_Prediction_All.csv")
+
+# Convert from wide to long format
+long_data <- data %>%
+  pivot_longer(cols = -Genotype, 
+               names_to = "Wavelength", 
+               values_to = "Reflectance") %>%
+  mutate(Wavelength = as.numeric(Wavelength))  # Ensure numeric Wavelength
+
+# Define genotypes to highlight
+highlight_genotypes <- c("Ambassador", "MI14W0190")
+
+# Create a color group column: "Other" for non-highlighted genotypes
+long_data <- long_data %>%
+  mutate(ColorGroup = ifelse(Genotype %in% highlight_genotypes, Genotype, "Other"))
+
+# Compute mean spectral reflectance across all genotypes
+mean_reflectance <- long_data %>%
+  group_by(Wavelength) %>%
+  summarise(MeanReflectance = mean(Reflectance, na.rm = TRUE)) %>%
+  mutate(ColorGroup = "Mean")  # Label mean for legend
+
+# Combine mean data with long_data for legend handling
+legend_data <- bind_rows(
+  filter(long_data, Genotype %in% highlight_genotypes),
+  mean_reflectance
+)
+
+# Plot all genotypes in gray, highlight two genotypes, and add mean curve
+ggplot() +
+  # Plot all genotypes in gray
+  geom_line(data = long_data, aes(x = Wavelength, y = Reflectance, group = Genotype), color = "gray70", alpha = 0.3, size = 0.7) +
+  # Highlight specific genotypes and mean in legend
+  geom_line(data = legend_data, aes(x = Wavelength, y = ifelse(ColorGroup == "Mean", MeanReflectance, Reflectance), 
+                                    color = ColorGroup, linetype = ColorGroup), size = 1.2) +  # Thicker lines
+  scale_color_manual(values = c("Ambassador" = "#fdc640", "MI14W0190" = "#18453B", "Mean" = "red")) +
+  scale_linetype_manual(values = c("Ambassador" = "solid", "MI14W0190" = "solid", "Mean" = "dashed")) +  # Dashed line for mean
+  theme_minimal() +
+  labs(title = "Spectral Reflectance of Soft Winter Wheat Kernels - 2022 Trial",
+       x = "Wavelength (nm)",
+       y = "Spectral Reflectance Value",
+       color = "Legend",  # Legend title
+       linetype = "Legend") +  # Legend for line type
+  theme(
+    text = element_text(size = 18),          # Base text size
+    plot.title = element_text(size = 18, face = "bold", hjust = 0.5),  # Title size
+    axis.title.x = element_text(size = 18),  # X-axis title size
+    axis.title.y = element_text(size = 18),  # Y-axis title size
+    axis.text.x = element_text(size = 18),   # X-axis tick labels size
+    axis.text.y = element_text(size = 18),   # Y-axis tick labels size
+    legend.position = c(0.1, 0.9),  # Upper-left legend
+    legend.background = element_rect(fill = "white", color = "black")  # Add a box around the legend
+  )
